@@ -1,3 +1,4 @@
+import { createRequire } from "node:module";
 import { Command } from "commander";
 import { initCommand } from "./commands/init.ts";
 import { showConfig, setConfigCommand, resetConfig } from "./commands/config.ts";
@@ -5,13 +6,20 @@ import { listCommand } from "./commands/list.ts";
 import { currentCommand } from "./commands/current.ts";
 import { switchCommand } from "./commands/switch.ts";
 import { syncCommand } from "./commands/sync.ts";
+import { checkForUpdates } from "./lib/update-notifier.ts";
+
+const require = createRequire(import.meta.url);
+const { version } = require("../package.json");
 
 const program = new Command();
 
 program
   .name("neonbx")
   .description("Neon Database Branch Navigator CLI")
-  .version("0.1.0");
+  .version(version)
+  .action(() => {
+    program.outputHelp();
+  });
 
 program
   .command("init")
@@ -56,5 +64,7 @@ program
   .command("sync")
   .description("Auto-switch to the Neon branch matching current git branch")
   .action(syncCommand);
+
+program.hook("preAction", () => checkForUpdates(version));
 
 program.parse();

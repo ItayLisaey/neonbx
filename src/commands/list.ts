@@ -5,7 +5,7 @@ import { getNeonBranches } from "../lib/neon-api.ts";
 
 export async function listCommand(): Promise<void> {
   const config = ensureConfig();
-  const branches = await getNeonBranches(config.apiKey, config.projectId);
+  const branches = await getNeonBranches(config.projectId);
 
   if (branches.length === 0) {
     p.log.warning("No branches found.");

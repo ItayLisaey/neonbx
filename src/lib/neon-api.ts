@@ -1,4 +1,5 @@
 import * as p from "@clack/prompts";
+import { getAccessToken } from "./neon-auth.ts";
 
 const BASE_URL = "https://console.neon.tech/api/v2";
 
@@ -20,19 +21,18 @@ interface NeonEndpoint {
   pooler_enabled: boolean;
 }
 
-interface NeonConnectionURI {
-  uri: string;
+interface NeonProject {
+  id: string;
+  name: string;
+  region_id: string;
+  created_at: string;
 }
 
-async function neonFetch<T>(
-  path: string,
-  apiKey: string,
-  projectId: string
-): Promise<T> {
-  const url = `${BASE_URL}/projects/${projectId}${path}`;
+async function neonFetchRaw<T>(url: string): Promise<T> {
+  const token = getAccessToken();
   const response = await fetch(url, {
     headers: {
-      Authorization: `Bearer ${apiKey}`,
+      Authorization: `Bearer ${token}`,
       Accept: "application/json",
     },
   });
@@ -45,8 +45,27 @@ async function neonFetch<T>(
   return response.json() as Promise<T>;
 }
 
+async function neonFetch<T>(path: string, projectId: string): Promise<T> {
+  return neonFetchRaw<T>(`${BASE_URL}/projects/${projectId}${path}`);
+}
+
+export async function getNeonProjects(): Promise<NeonProject[]> {
+  const s = p.spinner();
+  s.start("Fetching projects from Neon...");
+
+  try {
+    const data = await neonFetchRaw<{ projects: NeonProject[] }>(
+      `${BASE_URL}/projects`
+    );
+    s.stop("Projects loaded.");
+    return data.projects;
+  } catch (err) {
+    s.stop("Failed to fetch projects.");
+    throw err;
+  }
+}
+
 export async function getNeonBranches(
-  apiKey: string,
   projectId: string
 ): Promise<NeonBranch[]> {
   const s = p.spinner();
@@ -55,7 +74,6 @@ export async function getNeonBranches(
   try {
     const data = await neonFetch<{ branches: NeonBranch[] }>(
       "/branches",
-      apiKey,
       projectId
     );
     s.stop("Branches loaded.");
@@ -67,7 +85,6 @@ export async function getNeonBranches(
 }
 
 export async function getNeonEndpoints(
-  apiKey: string,
   projectId: string,
   branchId?: string
 ): Promise<NeonEndpoint[]> {
@@ -76,7 +93,6 @@ export async function getNeonEndpoints(
     : "/endpoints";
   const data = await neonFetch<{ endpoints: NeonEndpoint[] }>(
     path,
-    apiKey,
     projectId
   );
   return data.endpoints;
@@ -84,12 +100,11 @@ export async function getNeonEndpoints(
 
 export async function getNeonBranchConnectionURI(
   branchId: string,
-  endpointId: string,
-  apiKey: string,
   projectId: string,
   pooled: boolean = true
 ): Promise<string> {
   const params = new URLSearchParams({
+    branch_id: branchId,
     role_name: "neondb_owner",
     database_name: "neondb",
   });
@@ -98,19 +113,10 @@ export async function getNeonBranchConnectionURI(
   }
 
   const data = await neonFetch<{ uri: string }>(
-    `/branches/${branchId}/endpoints/${endpointId}/connection_uri?${params}`,
-    apiKey,
+    `/connection_uri?${params}`,
     projectId
   );
   return data.uri;
-}
-
-export function getEndpointHost(endpoint: NeonEndpoint, pooled: boolean): string {
-  const host = endpoint.host;
-  if (pooled) {
-    return host.replace(/\./, "-pooler.");
-  }
-  return host;
 }
 
 export type { NeonBranch, NeonEndpoint };

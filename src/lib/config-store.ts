@@ -2,12 +2,8 @@ import Conf from "conf";
 import * as p from "@clack/prompts";
 import pc from "picocolors";
 
-export type SecretStorageType = "env" | "env.local" | "keychain";
-
 export interface NeonbxConfig {
   projectId: string;
-  apiKey: string;
-  secretStorage: SecretStorageType;
   envFilePath: string;
   pooledKey: string;
   unpooledKey: string;
@@ -16,8 +12,6 @@ export interface NeonbxConfig {
 
 const CONFIG_KEYS: (keyof NeonbxConfig)[] = [
   "projectId",
-  "apiKey",
-  "secretStorage",
   "envFilePath",
   "pooledKey",
   "unpooledKey",
@@ -66,7 +60,7 @@ export function setConfigValue<K extends keyof NeonbxConfig>(
 
 export function ensureConfig(): NeonbxConfig {
   const cfg = getConfig();
-  if (!cfg.projectId || !cfg.apiKey) {
+  if (!cfg.projectId) {
     p.log.error(
       `No configuration found. Run ${pc.cyan("neonbx init")} first.`
     );

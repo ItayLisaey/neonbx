@@ -20,11 +20,10 @@ export async function currentCommand(): Promise<void> {
 
   try {
     const [branches, endpoints] = await Promise.all([
-      getNeonBranches(config.apiKey, config.projectId),
-      getNeonEndpoints(config.apiKey, config.projectId),
+      getNeonBranches(config.projectId),
+      getNeonEndpoints(config.projectId),
     ]);
 
-    // Extract the host from the connection URI to match against endpoints
     const uriHost = extractHost(uri);
 
     const matchedEndpoint = endpoints.find(

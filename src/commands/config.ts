@@ -7,6 +7,7 @@ import {
   setConfigValue,
   type NeonbxConfig,
 } from "../lib/config-store.ts";
+import { hasCredentials } from "../lib/neon-auth.ts";
 import { handleCancel } from "../lib/cancel.ts";
 
 export function showConfig(): void {
@@ -21,16 +22,9 @@ export function showConfig(): void {
 
   p.intro(pc.cyan("neonbx") + " — Current Config");
 
-  const maskKey = (key?: string) => {
-    if (!key) return pc.dim("(not set)");
-    if (key.length <= 8) return "••••••••";
-    return key.slice(0, 4) + "••••" + key.slice(-4);
-  };
-
   const entries: [string, string][] = [
     ["Project ID", config.projectId ?? pc.dim("(not set)")],
-    ["API Key", maskKey(config.apiKey)],
-    ["Secret Storage", config.secretStorage ?? pc.dim("(not set)")],
+    ["Auth", hasCredentials() ? pc.green("authenticated") : pc.red("not authenticated")],
     ["Env File Path", config.envFilePath ?? pc.dim("(not set)")],
     ["Pooled Key", config.pooledKey ?? pc.dim("(not set)")],
     ["Unpooled Key", config.unpooledKey ?? pc.dim("(not set)")],
@@ -47,8 +41,6 @@ export function showConfig(): void {
 
 const VALID_KEYS: (keyof NeonbxConfig)[] = [
   "projectId",
-  "apiKey",
-  "secretStorage",
   "envFilePath",
   "pooledKey",
   "unpooledKey",
@@ -64,7 +56,7 @@ export function setConfigCommand(key: string, value: string): void {
   }
 
   setConfigValue(key as keyof NeonbxConfig, value as never);
-  p.log.success(`Set ${pc.bold(key)} = ${key === "apiKey" ? "••••••••" : value}`);
+  p.log.success(`Set ${pc.bold(key)} = ${value}`);
 }
 
 export async function resetConfig(): Promise<void> {

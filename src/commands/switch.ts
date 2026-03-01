@@ -1,9 +1,8 @@
 import * as p from "@clack/prompts";
 import pc from "picocolors";
-import { ensureConfig } from "../lib/config-store.ts";
+import { ensureConfig, type NeonbxConfig } from "../lib/config-store.ts";
 import {
   getNeonBranches,
-  getNeonEndpoints,
   getNeonBranchConnectionURI,
   type NeonBranch,
 } from "../lib/neon-api.ts";
@@ -12,7 +11,7 @@ import { handleCancel } from "../lib/cancel.ts";
 
 export async function switchCommand(branchName?: string): Promise<void> {
   const config = ensureConfig();
-  const branches = await getNeonBranches(config.apiKey, config.projectId);
+  const branches = await getNeonBranches(config.projectId);
 
   let targetBranch: NeonBranch | undefined;
 
@@ -35,58 +34,37 @@ export async function switchCommand(branchName?: string): Promise<void> {
     targetBranch = branches.find((b) => b.name === selected)!;
   }
 
-  // Confirm if switching to default/main branch
   if (targetBranch.primary || targetBranch.name === config.defaultBranch) {
-    const confirmed = await p.confirm({
-      message: `Switch to ${pc.bold(targetBranch.name)} (primary branch)?`,
-    });
-    handleCancel(confirmed);
-    if (!confirmed) {
-      p.log.info("Switch cancelled.");
-      return;
-    }
+    await confirmMainBranch(targetBranch.name);
   }
 
   await switchToBranch(targetBranch, config);
 }
 
+export async function confirmMainBranch(branchName: string): Promise<void> {
+  p.log.warning(
+    `${pc.bold(branchName)} is a protected branch.`
+  );
+  const typed = await p.text({
+    message: `Type ${pc.bold(branchName)} to confirm`,
+    validate: (v) => {
+      if (v !== branchName) return `You must type "${branchName}" exactly to proceed.`;
+    },
+  });
+  handleCancel(typed);
+}
+
 export async function switchToBranch(
   branch: NeonBranch,
-  config: ReturnType<typeof ensureConfig>
+  config: NeonbxConfig
 ): Promise<void> {
   const s = p.spinner();
   s.start(`Switching to ${pc.bold(branch.name)}...`);
 
   try {
-    const endpoints = await getNeonEndpoints(
-      config.apiKey,
-      config.projectId,
-      branch.id
-    );
-
-    if (endpoints.length === 0) {
-      s.stop("Failed.");
-      p.log.error(`No endpoints found for branch ${pc.bold(branch.name)}.`);
-      return;
-    }
-
-    const endpoint = endpoints[0];
-
     const [pooledURI, unpooledURI] = await Promise.all([
-      getNeonBranchConnectionURI(
-        branch.id,
-        endpoint.id,
-        config.apiKey,
-        config.projectId,
-        true
-      ),
-      getNeonBranchConnectionURI(
-        branch.id,
-        endpoint.id,
-        config.apiKey,
-        config.projectId,
-        false
-      ),
+      getNeonBranchConnectionURI(branch.id, config.projectId, true),
+      getNeonBranchConnectionURI(branch.id, config.projectId, false),
     ]);
 
     replaceConnection(

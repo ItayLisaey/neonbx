@@ -3,8 +3,7 @@ import pc from "picocolors";
 import { ensureConfig } from "../lib/config-store.ts";
 import { getCurrentBranch } from "../lib/git.ts";
 import { getNeonBranches } from "../lib/neon-api.ts";
-import { switchToBranch } from "./switch.ts";
-import { handleCancel } from "../lib/cancel.ts";
+import { switchToBranch, confirmMainBranch } from "./switch.ts";
 
 export async function syncCommand(): Promise<void> {
   const config = ensureConfig();
@@ -21,9 +20,8 @@ export async function syncCommand(): Promise<void> {
 
   p.log.info(`Current git branch: ${pc.bold(gitBranch)}`);
 
-  const branches = await getNeonBranches(config.apiKey, config.projectId);
+  const branches = await getNeonBranches(config.projectId);
 
-  // If on main/master git branch, use the configured default branch
   const targetName =
     gitBranch === "main" || gitBranch === "master"
       ? config.defaultBranch
@@ -41,16 +39,8 @@ export async function syncCommand(): Promise<void> {
     process.exit(1);
   }
 
-  // Confirm if syncing to primary branch
   if (targetBranch.primary || targetBranch.name === config.defaultBranch) {
-    const confirmed = await p.confirm({
-      message: `Sync to ${pc.bold(targetBranch.name)} (primary branch)?`,
-    });
-    handleCancel(confirmed);
-    if (!confirmed) {
-      p.log.info("Sync cancelled.");
-      return;
-    }
+    await confirmMainBranch(targetBranch.name);
   }
 
   await switchToBranch(targetBranch, config);

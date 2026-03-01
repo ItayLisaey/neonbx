@@ -1,12 +1,8 @@
 import * as p from "@clack/prompts";
 import pc from "picocolors";
-import {
-  getConfig,
-  setConfig,
-  type NeonbxConfig,
-  type SecretStorageType,
-} from "../lib/config-store.ts";
-import { storeSecrets } from "../lib/secret-store.ts";
+import { getConfig, setConfig, type NeonbxConfig } from "../lib/config-store.ts";
+import { runNeonAuth, hasCredentials } from "../lib/neon-auth.ts";
+import { getNeonProjects } from "../lib/neon-api.ts";
 import { handleCancel } from "../lib/cancel.ts";
 
 export async function initCommand(): Promise<void> {
@@ -14,42 +10,47 @@ export async function initCommand(): Promise<void> {
 
   const current = getConfig();
 
-  const projectId = await p.text({
-    message: "Neon Project ID",
-    placeholder: "ep-cool-darkness-123456",
-    initialValue: current.projectId,
-    validate: (v) => {
-      if (!v.trim()) return "Project ID is required.";
-    },
-  });
-  handleCancel(projectId);
+  // OAuth authentication
+  if (hasCredentials()) {
+    const reauth = await p.confirm({
+      message: "Already authenticated with Neon. Re-authenticate?",
+      initialValue: false,
+    });
+    handleCancel(reauth);
+    if (reauth) {
+      runNeonAuth();
+    }
+  } else {
+    p.log.info("Let's connect to your Neon account.");
+    runNeonAuth();
+  }
 
-  const apiKey = await p.password({
-    message: "Neon API Key",
-    validate: (v) => {
-      if (!v?.trim()) return "API key is required.";
-    },
-  });
-  handleCancel(apiKey);
+  // Fetch projects and let user pick
+  const projects = await getNeonProjects();
 
-  const secretStorage = await p.select({
-    message: "Where should we store your secrets?",
-    initialValue: (current.secretStorage ?? "env.local") as SecretStorageType,
-    options: [
-      {
-        value: "env.local" as const,
-        label: ".env.local",
-        hint: "recommended — gitignored by default",
-      },
-      { value: "env" as const, label: ".env" },
-      {
-        value: "keychain" as const,
-        label: "System Keychain",
-        hint: "macOS Keychain",
-      },
-    ],
-  });
-  handleCancel(secretStorage);
+  if (projects.length === 0) {
+    p.log.error("No projects found in your Neon account.");
+    process.exit(1);
+  }
+
+  let projectId: string;
+
+  if (projects.length === 1) {
+    projectId = projects[0].id;
+    p.log.info(`Using project: ${pc.bold(projects[0].name)} ${pc.dim(`(${projectId})`)}`);
+  } else {
+    const selected = await p.select({
+      message: "Select a Neon project",
+      initialValue: current.projectId,
+      options: projects.map((proj) => ({
+        value: proj.id,
+        label: proj.name,
+        hint: proj.id,
+      })),
+    });
+    handleCancel(selected);
+    projectId = selected as string;
+  }
 
   const envFilePath = await p.text({
     message: "Path to your .env file (for DB URLs)",
@@ -87,13 +88,8 @@ export async function initCommand(): Promise<void> {
   });
   handleCancel(defaultBranch);
 
-  const s = p.spinner();
-  s.start("Saving configuration...");
-
   const config: NeonbxConfig = {
-    projectId: projectId as string,
-    apiKey: apiKey as string,
-    secretStorage: secretStorage as SecretStorageType,
+    projectId,
     envFilePath: envFilePath as string,
     pooledKey: pooledKey as string,
     unpooledKey: unpooledKey as string,
@@ -101,15 +97,6 @@ export async function initCommand(): Promise<void> {
   };
 
   setConfig(config);
-
-  await storeSecrets(
-    config.secretStorage,
-    config.projectId,
-    config.apiKey,
-    config.secretStorage !== "keychain" ? config.envFilePath : undefined
-  );
-
-  s.stop("Configuration saved!");
 
   p.outro(
     `You're all set! Run ${pc.cyan("neonbx list")} to see your branches.`
