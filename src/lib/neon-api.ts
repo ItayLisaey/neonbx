@@ -62,7 +62,7 @@ export async function getNeonOrganizations(): Promise<NeonOrganization[]> {
 
   try {
     const data = await neonFetchRaw<{ organizations: NeonOrganization[] }>(
-      `${BASE_URL}/organizations`
+      `${BASE_URL}/users/me/organizations`
     );
     s.stop("Organizations loaded.");
     return data.organizations;
