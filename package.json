@@ -1,6 +1,6 @@
 {
   "name": "neonbx",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "Neon Database Branch Navigator CLI — switch between Neon Postgres branches by updating local .env connection strings",
   "type": "module",
   "bin": {
