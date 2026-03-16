@@ -2,7 +2,7 @@ import * as p from "@clack/prompts";
 import pc from "picocolors";
 import { getConfig, setConfig, type NeonbxConfig } from "../lib/config-store.ts";
 import { runNeonAuth, hasCredentials } from "../lib/neon-auth.ts";
-import { getNeonProjects } from "../lib/neon-api.ts";
+import { getNeonProjects, getNeonOrganizations } from "../lib/neon-api.ts";
 import { handleCancel } from "../lib/cancel.ts";
 
 export async function initCommand(): Promise<void> {
@@ -25,8 +25,29 @@ export async function initCommand(): Promise<void> {
     runNeonAuth();
   }
 
+  // Fetch organizations and let user pick if needed
+  const orgs = await getNeonOrganizations();
+  let orgId: string | undefined;
+
+  if (orgs.length === 1) {
+    orgId = orgs[0].id;
+    p.log.info(`Using organization: ${pc.bold(orgs[0].name)} ${pc.dim(`(${orgId})`)}`);
+  } else if (orgs.length > 1) {
+    const selectedOrg = await p.select({
+      message: "Select a Neon organization",
+      initialValue: current.orgId,
+      options: orgs.map((org) => ({
+        value: org.id,
+        label: org.name,
+        hint: org.id,
+      })),
+    });
+    handleCancel(selectedOrg);
+    orgId = selectedOrg as string;
+  }
+
   // Fetch projects and let user pick
-  const projects = await getNeonProjects();
+  const projects = await getNeonProjects(orgId);
 
   if (projects.length === 0) {
     p.log.error("No projects found in your Neon account.");
@@ -89,6 +110,7 @@ export async function initCommand(): Promise<void> {
   handleCancel(defaultBranch);
 
   const config: NeonbxConfig = {
+    orgId,
     projectId,
     envFilePath: envFilePath as string,
     pooledKey: pooledKey as string,

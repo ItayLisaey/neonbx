@@ -21,11 +21,18 @@ interface NeonEndpoint {
   pooler_enabled: boolean;
 }
 
+interface NeonOrganization {
+  id: string;
+  name: string;
+  created_at: string;
+}
+
 interface NeonProject {
   id: string;
   name: string;
   region_id: string;
   created_at: string;
+  org_id?: string;
 }
 
 async function neonFetchRaw<T>(url: string): Promise<T> {
@@ -49,14 +56,31 @@ async function neonFetch<T>(path: string, projectId: string): Promise<T> {
   return neonFetchRaw<T>(`${BASE_URL}/projects/${projectId}${path}`);
 }
 
-export async function getNeonProjects(): Promise<NeonProject[]> {
+export async function getNeonOrganizations(): Promise<NeonOrganization[]> {
+  const s = p.spinner();
+  s.start("Fetching organizations from Neon...");
+
+  try {
+    const data = await neonFetchRaw<{ organizations: NeonOrganization[] }>(
+      `${BASE_URL}/organizations`
+    );
+    s.stop("Organizations loaded.");
+    return data.organizations;
+  } catch (err) {
+    s.stop("Failed to fetch organizations.");
+    throw err;
+  }
+}
+
+export async function getNeonProjects(orgId?: string): Promise<NeonProject[]> {
   const s = p.spinner();
   s.start("Fetching projects from Neon...");
 
   try {
-    const data = await neonFetchRaw<{ projects: NeonProject[] }>(
-      `${BASE_URL}/projects`
-    );
+    const url = orgId
+      ? `${BASE_URL}/projects?org_id=${orgId}`
+      : `${BASE_URL}/projects`;
+    const data = await neonFetchRaw<{ projects: NeonProject[] }>(url);
     s.stop("Projects loaded.");
     return data.projects;
   } catch (err) {
@@ -119,4 +143,4 @@ export async function getNeonBranchConnectionURI(
   return data.uri;
 }
 
-export type { NeonBranch, NeonEndpoint };
+export type { NeonBranch, NeonEndpoint, NeonOrganization };

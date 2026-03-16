@@ -3,6 +3,7 @@ import * as p from "@clack/prompts";
 import pc from "picocolors";
 
 export interface NeonbxConfig {
+  orgId?: string;
   projectId: string;
   envFilePath: string;
   pooledKey: string;
@@ -11,6 +12,7 @@ export interface NeonbxConfig {
 }
 
 const CONFIG_KEYS: (keyof NeonbxConfig)[] = [
+  "orgId",
   "projectId",
   "envFilePath",
   "pooledKey",
